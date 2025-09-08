@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import HLSPlayer from '@/components/HLSPlayer';
+import ComparisonPlayer from '@/components/ComparisonPlayer';
 import DeviceInfo from '@/components/DeviceInfo';
 import StreamSelector from '@/components/StreamSelector';
 import TestControlPanel from '@/components/TestControlPanel';
@@ -11,6 +12,11 @@ export default function Home() {
   const [selectedStream, setSelectedStream] = useState<StreamConfig | null>(null);
   const [playerErrors, setPlayerErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'single' | 'comparison'>('single');
+  const [comparisonMetrics, setComparisonMetrics] = useState<{
+    nativePlayer: { playerType: string; loadTime: number; currentTime: number; buffered: number; isPlaying: boolean };
+    hlsjsPlayer: { playerType: string; loadTime: number; currentTime: number; buffered: number; isPlaying: boolean };
+  } | null>(null);
 
   const handleStreamSelect = useCallback((stream: StreamConfig) => {
     setSelectedStream(stream);
@@ -29,6 +35,13 @@ export default function Home() {
 
   const handleLoadComplete = useCallback(() => {
     setIsLoading(false);
+  }, []);
+
+  const handleComparisonMetrics = useCallback((metrics: {
+    nativePlayer: { playerType: string; loadTime: number; currentTime: number; buffered: number; isPlaying: boolean };
+    hlsjsPlayer: { playerType: string; loadTime: number; currentTime: number; buffered: number; isPlaying: boolean };
+  }) => {
+    setComparisonMetrics(metrics);
   }, []);
 
   return (
@@ -90,55 +103,151 @@ export default function Home() {
               <h2 className="text-xl font-bold text-gray-900">
                 🎬 Video Player
               </h2>
-              {selectedStream && (
-                <div className="text-sm text-gray-600">
-                  <span className="font-medium">{selectedStream.type}</span> • {selectedStream.resolution}
+              <div className="flex items-center gap-4">
+                {/* View Mode Toggle */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">View:</span>
+                  <button
+                    onClick={() => setViewMode('single')}
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                      viewMode === 'single'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    📱 Single
+                  </button>
+                  <button
+                    onClick={() => setViewMode('comparison')}
+                    className={`px-3 py-1 text-sm rounded transition-colors ${
+                      viewMode === 'comparison'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    🔄 Compare
+                  </button>
                 </div>
-              )}
+                
+                {selectedStream && (
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">{selectedStream.type}</span> • {selectedStream.resolution}
+                  </div>
+                )}
+              </div>
             </div>
 
             {selectedStream ? (
               <div className="space-y-4">
-                <HLSPlayer
-                  src={selectedStream.url}
-                  title={selectedStream.name}
-                  className="w-full max-w-4xl mx-auto"
-                  onError={handlePlayerError}
-                  onLoadStart={handleLoadStart}
-                  onLoadComplete={handleLoadComplete}
-                />
+                {viewMode === 'single' ? (
+                  <HLSPlayer
+                    src={selectedStream.url}
+                    title={selectedStream.name}
+                    className="w-full max-w-4xl mx-auto"
+                    onError={handlePlayerError}
+                    onLoadStart={handleLoadStart}
+                    onLoadComplete={handleLoadComplete}
+                  />
+                ) : (
+                  <ComparisonPlayer
+                    src={selectedStream.url}
+                    title={selectedStream.name}
+                    className="w-full"
+                    onMetricsUpdate={handleComparisonMetrics}
+                  />
+                )}
                 
-                {/* Stream metadata */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-700">Stream Name:</span>
-                      <p className="text-gray-600">{selectedStream.name}</p>
+                {/* Stream metadata / Comparison Info */}
+                {viewMode === 'single' ? (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium text-gray-700">Stream Name:</span>
+                        <p className="text-gray-600">{selectedStream.name}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Resolution:</span>
+                        <p className="text-gray-600">{selectedStream.resolution}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Type:</span>
+                        <p className="text-gray-600">{selectedStream.type}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Source:</span>
+                        <p className="text-gray-600">{selectedStream.source}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Resolution:</span>
-                      <p className="text-gray-600">{selectedStream.resolution}</p>
+                    <div className="mt-3">
+                      <span className="font-medium text-gray-700">Description:</span>
+                      <p className="text-gray-600">{selectedStream.description}</p>
                     </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Type:</span>
-                      <p className="text-gray-600">{selectedStream.type}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-700">Source:</span>
-                      <p className="text-gray-600">{selectedStream.source}</p>
+                    <div className="mt-3">
+                      <span className="font-medium text-gray-700">URL:</span>
+                      <p className="text-xs font-mono text-gray-500 break-all bg-white p-2 rounded border">
+                        {selectedStream.url}
+                      </p>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <span className="font-medium text-gray-700">Description:</span>
-                    <p className="text-gray-600">{selectedStream.description}</p>
+                ) : comparisonMetrics ? (
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h3 className="font-medium text-blue-800 mb-3">🔄 Comparison Analysis</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-medium text-blue-700 mb-2">Safari Native</h4>
+                        <div className="space-y-1 text-sm">
+                          <div>Type: <span className="font-mono">{comparisonMetrics.nativePlayer.playerType}</span></div>
+                          <div>Load Time: <span className="font-mono">{comparisonMetrics.nativePlayer.loadTime}ms</span></div>
+                          <div>Current Time: <span className="font-mono">{comparisonMetrics.nativePlayer.currentTime.toFixed(2)}s</span></div>
+                          <div>Buffer: <span className="font-mono">{comparisonMetrics.nativePlayer.buffered.toFixed(1)}s</span></div>
+                          <div>Playing: <span className={`font-medium ${comparisonMetrics.nativePlayer.isPlaying ? 'text-green-600' : 'text-gray-600'}`}>
+                            {comparisonMetrics.nativePlayer.isPlaying ? '▶️ Yes' : '⏸️ No'}
+                          </span></div>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-blue-700 mb-2">HLS.js</h4>
+                        <div className="space-y-1 text-sm">
+                          <div>Type: <span className="font-mono">{comparisonMetrics.hlsjsPlayer.playerType}</span></div>
+                          <div>Load Time: <span className="font-mono">{comparisonMetrics.hlsjsPlayer.loadTime}ms</span></div>
+                          <div>Current Time: <span className="font-mono">{comparisonMetrics.hlsjsPlayer.currentTime.toFixed(2)}s</span></div>
+                          <div>Buffer: <span className="font-mono">{comparisonMetrics.hlsjsPlayer.buffered.toFixed(1)}s</span></div>
+                          <div>Playing: <span className={`font-medium ${comparisonMetrics.hlsjsPlayer.isPlaying ? 'text-green-600' : 'text-gray-600'}`}>
+                            {comparisonMetrics.hlsjsPlayer.isPlaying ? '▶️ Yes' : '⏸️ No'}
+                          </span></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-blue-200">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div className="bg-white p-2 rounded">
+                          <div className="font-medium text-gray-700">Sync Difference</div>
+                          <div className="text-lg font-mono text-blue-600">
+                            {Math.abs(comparisonMetrics.nativePlayer.currentTime - comparisonMetrics.hlsjsPlayer.currentTime).toFixed(3)}s
+                          </div>
+                        </div>
+                        <div className="bg-white p-2 rounded">
+                          <div className="font-medium text-gray-700">Load Time Diff</div>
+                          <div className="text-lg font-mono text-blue-600">
+                            {Math.abs(comparisonMetrics.nativePlayer.loadTime - comparisonMetrics.hlsjsPlayer.loadTime)}ms
+                          </div>
+                        </div>
+                        <div className="bg-white p-2 rounded">
+                          <div className="font-medium text-gray-700">Buffer Diff</div>
+                          <div className="text-lg font-mono text-blue-600">
+                            {Math.abs(comparisonMetrics.nativePlayer.buffered - comparisonMetrics.hlsjsPlayer.buffered).toFixed(1)}s
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-3">
-                    <span className="font-medium text-gray-700">URL:</span>
-                    <p className="text-xs font-mono text-gray-500 break-all bg-white p-2 rounded border">
-                      {selectedStream.url}
-                    </p>
+                ) : (
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="text-yellow-800 text-sm">
+                      🔄 Initializing comparison players... Metrics will appear once both players are loaded.
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
