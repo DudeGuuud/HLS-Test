@@ -1,7 +1,7 @@
 {
-  "name": "HLS Safari Compatibility Test",
-  "short_name": "HLS Test",
-  "description": "专业的HLS.js在Safari浏览器下的兼容性测试工具",
+  "name": "Triple HLS Comparison Tool",
+  "short_name": "Triple HLS",
+  "description": "专业的三重HLS对比测试工具：Native HLS、HLS.js Standard、HLS.js ABR",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

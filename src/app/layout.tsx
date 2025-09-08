@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HLS Native vs HLS.js Comparison Tool",
-  description: "专业的原生HLS与HLS.js并排对比测试工具，支持实时性能分析和兼容性验证",
-  keywords: "HLS, Native HLS, HLS.js, 对比测试, 视频流, 兼容性分析, 性能对比",
+  title: "Triple HLS Comparison Tool",
+  description: "专业的三重HLS对比测试工具：Native HLS、HLS.js Standard、HLS.js ABR 实时性能分析",
+  keywords: "HLS, Native HLS, HLS.js, ABR, 三重对比, 视频流, 兼容性分析, 自适应码率",
   manifest: "/manifest.json",
 };
 
