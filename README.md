@@ -1,8 +1,8 @@
-# HLS Safari Compatibility Test - 项目技术文档
+# Triple HLS Comparison Tool - 项目技术文档
 
 ## 项目概述
 
-HLS Safari Compatibility Test 是一个专业的 HLS (HTTP Live Streaming) 兼容性测试工具，主要用于测试 HLS.js 在 Safari 浏览器及其他浏览器环境下的兼容性。该项目基于 Next.js 15 构建，使用 TypeScript 开发，支持多种视频流格式和设备环境测试。
+Triple HLS Comparison Tool 是一个专业的 HLS (HTTP Live Streaming) 三重对比测试工具，同时运行三种不同的 HLS 播放器进行对比：Native HLS、HLS.js Standard 和 HLS.js ABR。该项目基于 Next.js 15 构建，使用 TypeScript 开发，提供专业级的流媒体兼容性测试功能。
 
 ## 技术栈详情
 
@@ -41,52 +41,228 @@ src/
 │   ├── page.tsx           # 首页组件
 │   └── globals.css        # 全局样式
 ├── components/            # 可复用组件
-│   ├── HLSPlayer.tsx      # 核心视频播放器
+│   ├── TripleComparisonPlayer.tsx # 三重对比播放器
 │   ├── StreamSelector.tsx # 流选择器
-│   ├── DeviceInfo.tsx     # 设备信息展示
-│   └── TestControlPanel.tsx # 测试控制面板
+│   └── DeviceInfo.tsx     # 设备信息展示
 └── data/
     └── test-streams.ts    # 测试流数据配置
 ```
 
 ### 核心组件架构
 
+# 🔄 Triple HLS Comparison Mode 使用指南
+
+## 功能概述
+
+Triple Comparison Mode 允许您同时运行三种不同的 HLS 播放器，实时对比它们的性能和兼容性差异：
+
+1. **Native HLS** - 浏览器原生 HLS 支持
+2. **HLS.js Standard** - 标准 HLS.js 配置
+3. **HLS.js ABR** - 增强自适应码率配置
+
+## 如何使用Triple Comparison Mode
+
+### 1. 选择测试流
+1. 从流选择器中选择一个预设的测试流
+2. 或者输入自定义 HLS 流 URL
+3. 支持的测试流包括：
+   - Big Buck Bunny (fMP4) - Apple官方测试流
+   - Dolby Vision/Atmos (4K HDR) - 高质量HDR内容
+   - Wowza Test Stream - Bitdash测试流
+   - HLS.js Demo Stream - Mux低带宽测试
+   - Cloudflare Stream - 自适应码率测试
+
+### 2. 三重播放器布局
+
+#### 播放器配置说明
+- **左侧 - Native HLS**: 使用浏览器原生 HLS 支持，在 Safari 中提供最佳性能
+- **中间 - HLS.js Standard**: 使用标准 HLS.js 配置，适用于大多数浏览器
+- **右侧 - HLS.js ABR**: 使用增强 ABR 配置，优化自适应码率切换
+
+#### 播放器控件
+每个播放器都有独立的控制：
+- **播放/暂停按钮**: 独立控制每个播放器
+- **音量控制**: 独立音量设置
+- **进度条**: 显示播放进度和缓冲状态
+
+## 实时指标监控
+
+### 播放器信息覆盖层
+每个播放器显示实时指标：
+- **Player Type**: 播放器类型识别
+- **Load Time**: 初始化加载时间
+- **Current Time**: 当前播放时间
+- **Buffer**: 缓冲区剩余时间
+- **Bitrate**: 当前码率（kbps）
+- **Playing**: 播放状态指示
+
+### Triple Comparison Analysis 面板
+显示三个播放器的详细对比：
+
+```
+Native HLS              HLS.js Standard         HLS.js ABR
+Type: native            Type: hls.js            Type: hls.js-abr
+Load Time: 245ms        Load Time: 312ms        Load Time: 289ms
+Current Time: 15.23s    Current Time: 15.19s    Current Time: 15.21s
+Buffer: 5.2s           Buffer: 4.8s            Buffer: 6.1s
+Bitrate: 2500kbps      Bitrate: 2300kbps       Bitrate: 2800kbps
+Playing: ▶️ Yes         Playing: ▶️ Yes          Playing: ▶️ Yes
+```
+
+### 关键差异指标
+- **Max Sync Diff**: 三个播放器间的最大时间同步差异
+- **Load Time Range**: 加载时间差异范围
+- **Buffer Range**: 缓冲区差异范围  
+- **Bitrate Range**: 码率差异范围
+
+## 验证兼容性的关键指标
+
+### 1. 播放同步性
+- **理想值**: < 0.5s 差异
+- **警告值**: 0.5s - 2s 差异
+- **问题指标**: > 2s 差异表示存在兼容性问题
+
+### 2. 加载性能对比
+- Native HLS 通常在 Safari 中加载最快
+- HLS.js Standard 提供跨浏览器一致性
+- HLS.js ABR 可能有轻微延迟但提供更好的自适应性
+
+### 3. 缓冲区管理
+- 观察三个播放器的缓冲策略差异
+- ABR 配置通常维持更大的缓冲区
+- Native HLS 依赖浏览器默认缓冲策略
+
+### 4. 自适应码率行为
+- 比较不同配置的码率切换策略
+- ABR 配置对网络变化更敏感
+- 监控码率切换的平滑度
+
+## 常见测试场景
+
+### 1. 基础兼容性测试
+```
+1. 选择 Big Buck Bunny 测试流
+2. 观察三个播放器的加载时间
+3. 检查播放同步差异
+4. 监控初始缓冲行为
+```
+
+### 2. 自适应码率测试
+```
+1. 选择多码率流（如 Cloudflare Stream）
+2. 模拟网络波动
+3. 对比三种播放器的码率切换
+4. 分析 ABR 配置的优势
+```
+
+### 3. 高质量内容测试
+```
+1. 选择 4K HDR Dolby Vision 内容
+2. 比较不同播放器的解码性能
+3. 检查高码率下的缓冲策略
+4. 验证高级特性支持
+```
+
+### 4. 跨浏览器兼容性测试
+```
+1. 在不同浏览器中测试相同流
+2. 对比 Safari vs Chrome vs Firefox
+3. 验证 Native HLS 与 HLS.js 的差异
+4. 记录特定浏览器的问题
+```
+
+## 故障排除指南
+
+### Native HLS 播放失败
+- **可能原因**: 浏览器不支持原生 HLS
+- **解决方案**: 在 Safari 中测试，或检查流格式兼容性
+
+### HLS.js 初始化错误
+- **可能原因**: MSE 不支持或流格式问题
+- **解决方案**: 检查浏览器 MediaSource 支持
+
+### 同步差异过大
+- **可能原因**: 网络延迟或解码性能差异
+- **分析方法**: 检查网络条件和设备性能
+
+### 码率切换异常
+- **可能原因**: ABR 配置过于激进或网络不稳定
+- **调整方案**: 修改 ABR 参数或测试不同网络环境
+
 ## 核心组件详解
 
-### 1. HLSPlayer 组件 - 视频播放核心
+### 1. TripleComparisonPlayer 组件 - 三重对比播放核心
 
-这是整个项目的核心组件，负责 HLS 视频流的播放和兼容性处理。
+这是项目的核心组件，同时管理三个不同的 HLS 播放器实例。
 
 #### 接口定义
 ```typescript
-interface HLSPlayerProps {
+interface TripleComparisonPlayerProps {
   src: string;
   title: string;
   className?: string;
-  onError?: (error: Error | { type?: string; message?: string; details?: string }) => void;
-  onLoadStart?: () => void;
-  onLoadComplete?: () => void;
+  onMetricsUpdate?: (metrics: {
+    nativePlayer: PlayerMetrics;
+    hlsjsPlayer: PlayerMetrics;
+    autoPlayer: PlayerMetrics;
+  }) => void;
+}
+
+interface PlayerMetrics {
+  playerType: string;
+  loadTime: number;
+  currentTime: number;
+  buffered: number;
+  isPlaying: boolean;
+  bitrate: number;
 }
 ```
 
-#### 核心状态管理
+#### 三种播放器配置
+
+##### 1. Native HLS 播放器
 ```typescript
-const [isLoading, setIsLoading] = useState(false);
-const [error, setError] = useState<string | null>(null);
-const [playerInfo, setPlayerInfo] = useState<{
-  currentLevel: number;
-  levels: Array<{ height?: number; width?: number; bitrate?: number; name?: string }>;
-  isSupported: boolean;
-  isSafari: boolean;
-  version: string;
-} | null>(null);
+// 检测原生 HLS 支持
+const nativeSupport = video.canPlayType('application/vnd.apple.mpegurl');
+if (nativeSupport) {
+  video.src = src; // 直接使用原生播放
+}
 ```
 
-#### Safari 检测逻辑
+##### 2. HLS.js Standard 配置
 ```typescript
-const isSafari = useCallback(() => {
-  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-}, []);
+const hls = new Hls({
+  debug: false,
+  enableWorker: true,
+  lowLatencyMode: true,
+  backBufferLength: 30,
+  maxBufferLength: 120,
+  maxMaxBufferLength: 300,
+});
+```
+
+##### 3. HLS.js ABR 增强配置
+```typescript
+const hls = new Hls({
+  debug: false,
+  enableWorker: true,
+  lowLatencyMode: true,
+  backBufferLength: 30,
+  maxBufferLength: 120,
+  maxMaxBufferLength: 300,
+  // ABR 特定设置
+  capLevelOnFPSDrop: true,
+  capLevelToPlayerSize: true,
+  abrEwmaFastLive: 3.0,
+  abrEwmaSlowLive: 9.0,
+  abrEwmaFastVoD: 3.0,
+  abrEwmaSlowVoD: 9.0,
+  abrEwmaDefaultEstimate: 500000,
+  abrBandWidthFactor: 0.95,
+  abrBandWidthUpFactor: 0.7,
+  maxStarvationDelay: 4,
+  maxLoadingDelay: 4,
+});
 ```
 
 #### 播放器初始化核心逻辑
@@ -732,15 +908,50 @@ useEffect(() => {
 - 可扩展的错误恢复策略
 - 详细的错误信息记录
 
+## 技术亮点
+
+### 1. 增强的 ABR 配置
+项目实现了专业级的自适应码率配置，包括：
+- **智能带宽检测**: `abrEwmaFastLive` 和 `abrEwmaSlowLive` 参数优化
+- **带宽因子调整**: `abrBandWidthFactor` 和 `abrBandWidthUpFactor` 精确控制
+- **延迟优化**: `maxStarvationDelay` 和 `maxLoadingDelay` 配置
+
+### 2. 三重对比实时监控
+- 同时监控三个播放器的性能指标
+- 实时计算同步差异和性能范围
+- 提供详细的播放状态可视化
+
+### 3. 专业测试流集合
+精选的测试流覆盖：
+- Apple 官方认证测试内容
+- 4K HDR 和 Dolby Vision 内容
+- 跨 CDN 分发测试
+- 自适应码率验证流
+
+## 开发和构建
+
+### 本地开发
+```bash
+npm run dev --turbopack    # 启动开发服务器
+npm run lint              # 代码检查
+npm run build --turbopack # 构建生产版本
+```
+
+### 部署要求
+- Node.js 18+
+- 支持 Next.js 15 的托管环境
+- 推荐 Vercel 部署以获得最佳性能
+
 ## 总结
 
-HLS Safari Compatibility Test 是一个技术先进、功能完善的 HLS 兼容性测试工具。它采用现代化的 React/Next.js 技术栈，结合专业的 HLS.js 视频播放库，为开发者提供了一个全面的 HLS 流媒体兼容性测试平台。
+Triple HLS Comparison Tool 是一个专业的 HLS 流媒体三重对比测试平台。通过同时运行 Native HLS、HLS.js Standard 和 HLS.js ABR 三种不同的播放器配置，为开发者提供了全面的 HLS 兼容性和性能分析能力。
 
-项目的核心价值在于：
+项目的核心价值：
 
-1. **专业性**: 深度集成 HLS.js，提供专业级别的流媒体播放支持
-2. **兼容性**: 智能适配不同浏览器环境，特别优化 Safari 体验
-3. **实用性**: 内置丰富的测试流和诊断工具，满足实际测试需求
-4. **可扩展性**: 组件化架构和配置化设计，易于维护和扩展
+1. **专业三重对比**: 同时测试三种不同的 HLS 播放策略
+2. **增强 ABR 优化**: 专业级自适应码率配置和优化
+3. **实时性能监控**: 详细的播放指标和同步分析
+4. **全面兼容性测试**: 涵盖多种设备和浏览器环境
+5. **现代化技术栈**: Next.js 15 + TypeScript + HLS.js 1.6.11
 
-通过详细的代码分析和工作流程说明，本文档为项目的理解、维护和扩展提供了全面的技术参考。
+这个工具特别适用于流媒体开发者、QA 工程师和视频平台技术团队，帮助他们验证 HLS 流在不同播放器配置下的表现差异，优化用户体验。

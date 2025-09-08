@@ -3,16 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 
-interface ComparisonPlayerProps {
+interface TripleComparisonPlayerProps {
   src: string;
   title: string;
   className?: string;
-  onMetricsUpdate?: (metrics: PlaybackMetrics) => void;
-}
-
-interface PlaybackMetrics {
-  nativePlayer: PlayerMetrics;
-  hlsjsPlayer: PlayerMetrics;
+  onMetricsUpdate?: (metrics: TriplePlayerMetrics) => void;
 }
 
 interface PlayerMetrics {
@@ -21,26 +16,35 @@ interface PlayerMetrics {
   buffered: number;
   errors: string[];
   quality: string;
-  playerType: 'native' | 'hls.js' | 'unsupported';
+  playerType: 'native' | 'hls.js' | 'auto' | 'unsupported';
   isPlaying: boolean;
   networkState: number;
   readyState: number;
+  bitrate: number;
   events: string[];
 }
 
-export default function ComparisonPlayer({ 
+interface TriplePlayerMetrics {
+  nativePlayer: PlayerMetrics;
+  hlsjsPlayer: PlayerMetrics;
+  autoPlayer: PlayerMetrics;
+}
+
+export default function TripleComparisonPlayer({ 
   src, 
   title, 
   className = '',
   onMetricsUpdate 
-}: ComparisonPlayerProps) {
+}: TripleComparisonPlayerProps) {
   const nativeVideoRef = useRef<HTMLVideoElement>(null);
   const hlsjsVideoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<Hls | null>(null);
+  const autoVideoRef = useRef<HTMLVideoElement>(null);
+  const hlsjsRef = useRef<Hls | null>(null);
+  const autoHlsRef = useRef<Hls | null>(null);
   
-  const [isLoading, setIsLoading] = useState({ native: false, hlsjs: false });
-  const [errors, setErrors] = useState({ native: '', hlsjs: '' });
-  const [metrics, setMetrics] = useState<PlaybackMetrics>({
+  const [isLoading, setIsLoading] = useState({ native: false, hlsjs: false, auto: false });
+  const [errors, setErrors] = useState({ native: '', hlsjs: '', auto: '' });
+  const [metrics, setMetrics] = useState<TriplePlayerMetrics>({
     nativePlayer: {
       loadTime: 0,
       currentTime: 0,
@@ -51,6 +55,7 @@ export default function ComparisonPlayer({
       isPlaying: false,
       networkState: 0,
       readyState: 0,
+      bitrate: 0,
       events: []
     },
     hlsjsPlayer: {
@@ -63,12 +68,25 @@ export default function ComparisonPlayer({
       isPlaying: false,
       networkState: 0,
       readyState: 0,
+      bitrate: 0,
+      events: []
+    },
+    autoPlayer: {
+      loadTime: 0,
+      currentTime: 0,
+      buffered: 0,
+      errors: [],
+      quality: 'Unknown',
+      playerType: 'unsupported',
+      isPlaying: false,
+      networkState: 0,
+      readyState: 0,
+      bitrate: 0,
       events: []
     }
   });
 
-
-  const addEvent = useCallback((player: 'native' | 'hlsjs', event: string) => {
+  const addEvent = useCallback((player: 'native' | 'hlsjs' | 'auto', event: string) => {
     const timestamp = new Date().toLocaleTimeString();
     const eventWithTime = `${timestamp}: ${event}`;
     
@@ -81,7 +99,7 @@ export default function ComparisonPlayer({
     }));
   }, []);
 
-  const updateMetrics = useCallback((player: 'native' | 'hlsjs', updates: Partial<PlayerMetrics>) => {
+  const updateMetrics = useCallback((player: 'native' | 'hlsjs' | 'auto', updates: Partial<PlayerMetrics>) => {
     setMetrics(prev => {
       const newMetrics = {
         ...prev,
@@ -102,6 +120,7 @@ export default function ComparisonPlayer({
     return 0;
   };
 
+  // Native Player Initialization
   const initializeNativePlayer = useCallback(async () => {
     if (!nativeVideoRef.current || !src) return;
 
@@ -114,7 +133,6 @@ export default function ComparisonPlayer({
     try {
       const nativeSupport = video.canPlayType('application/vnd.apple.mpegurl');
       
-      // 左侧强制尝试原生 HLS（无论什么浏览器）
       if (nativeSupport) {
         addEvent('native', 'Using browser native HLS support');
         video.src = src;
@@ -132,7 +150,7 @@ export default function ComparisonPlayer({
         });
       }
 
-      // 事件监听
+      // Event listeners
       video.addEventListener('loadstart', () => addEvent('native', 'Load start'));
       video.addEventListener('loadedmetadata', () => addEvent('native', 'Metadata loaded'));
       video.addEventListener('canplay', () => {
@@ -153,7 +171,7 @@ export default function ComparisonPlayer({
         addEvent('native', `Error: ${errorMsg}`);
       });
       
-      // 定时更新指标
+      // Update metrics interval
       const updateInterval = setInterval(() => {
         if (video) {
           updateMetrics('native', {
@@ -174,6 +192,7 @@ export default function ComparisonPlayer({
     }
   }, [src, addEvent, updateMetrics]);
 
+  // HLS.js Player Initialization  
   const initializeHlsjsPlayer = useCallback(async () => {
     if (!hlsjsVideoRef.current || !src) return;
 
@@ -185,25 +204,21 @@ export default function ComparisonPlayer({
 
     try {
       if (Hls.isSupported()) {
-        // 清理之前的实例
-        if (hlsRef.current) {
-          hlsRef.current.destroy();
+        if (hlsjsRef.current) {
+          hlsjsRef.current.destroy();
         }
 
         const hls = new Hls({
-          debug: process.env.NODE_ENV === 'development',
+          debug: false,
           enableWorker: true,
-          lowLatencyMode: true,
+          lowLatencyMode: false,
           backBufferLength: 90,
           maxBufferLength: 300,
           maxMaxBufferLength: 600,
-          capLevelOnFPSDrop: true,
-          capLevelToPlayerSize: true,
         });
 
-        hlsRef.current = hls;
+        hlsjsRef.current = hls;
 
-        // HLS.js 事件监听
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
           addEvent('hlsjs', `Manifest parsed: ${data.levels.length} levels`);
           updateMetrics('hlsjs', {
@@ -214,9 +229,11 @@ export default function ComparisonPlayer({
         });
 
         hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
-          addEvent('hlsjs', `Level switched to: ${data.level}`);
+          const level = data.level === -1 ? 'Auto' : data.level;
+          addEvent('hlsjs', `Level switched to: ${level}`);
           updateMetrics('hlsjs', {
-            quality: `Level ${data.level}`
+            quality: `Level ${level}`,
+            bitrate: data.level >= 0 ? hls.levels[data.level]?.bitrate || 0 : 0
           });
         });
 
@@ -243,16 +260,9 @@ export default function ComparisonPlayer({
           }
         });
 
-        hls.on(Hls.Events.FRAG_LOADED, () => {
-          addEvent('hlsjs', 'Fragment loaded');
-        });
-
         hls.loadSource(src);
         hls.attachMedia(video);
 
-        // 视频元素事件监听
-        video.addEventListener('loadstart', () => addEvent('hlsjs', 'Load start'));
-        video.addEventListener('loadedmetadata', () => addEvent('hlsjs', 'Metadata loaded'));
         video.addEventListener('canplay', () => {
           setIsLoading(prev => ({ ...prev, hlsjs: false }));
           addEvent('hlsjs', 'Can play');
@@ -266,7 +276,6 @@ export default function ComparisonPlayer({
           addEvent('hlsjs', 'Paused');
         });
 
-        // 定时更新指标
         const updateInterval = setInterval(() => {
           if (video && hls) {
             updateMetrics('hlsjs', {
@@ -293,51 +302,188 @@ export default function ComparisonPlayer({
     }
   }, [src, addEvent, updateMetrics]);
 
+  // Auto HLS Player Initialization (with ABR)
+  const initializeAutoPlayer = useCallback(async () => {
+    if (!autoVideoRef.current || !src) return;
+
+    const video = autoVideoRef.current;
+    const startTime = performance.now();
+    setIsLoading(prev => ({ ...prev, auto: true }));
+    setErrors(prev => ({ ...prev, auto: '' }));
+    addEvent('auto', 'Initializing Auto HLS player with ABR');
+
+    try {
+      if (Hls.isSupported()) {
+        if (autoHlsRef.current) {
+          autoHlsRef.current.destroy();
+        }
+
+        // Enhanced configuration for automatic bitrate selection
+        const hls = new Hls({
+          debug: false,
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 30,
+          maxBufferLength: 120,
+          maxMaxBufferLength: 300,
+          // ABR specific settings
+          capLevelOnFPSDrop: true,
+          capLevelToPlayerSize: true,
+          abrEwmaFastLive: 3.0,
+          abrEwmaSlowLive: 9.0,
+          abrEwmaFastVoD: 3.0,
+          abrEwmaSlowVoD: 9.0,
+          abrEwmaDefaultEstimate: 500000,
+          abrBandWidthFactor: 0.95,
+          abrBandWidthUpFactor: 0.7,
+          maxStarvationDelay: 4,
+          maxLoadingDelay: 4,
+        });
+
+        autoHlsRef.current = hls;
+
+        hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+          addEvent('auto', `Manifest parsed: ${data.levels.length} levels, ABR enabled`);
+          updateMetrics('auto', {
+            playerType: 'auto',
+            quality: `ABR (${data.levels.length} levels)`,
+            loadTime: Math.round(performance.now() - startTime)
+          });
+        });
+
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+          const level = data.level === -1 ? 'Auto' : data.level;
+          const bitrate = data.level >= 0 ? hls.levels[data.level]?.bitrate || 0 : 0;
+          addEvent('auto', `ABR switched to: ${level} (${Math.round(bitrate/1000)}kbps)`);
+          updateMetrics('auto', {
+            quality: `ABR Level ${level}`,
+            bitrate: bitrate
+          });
+        });
+
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          const errorMsg = `Auto HLS Error: ${data.type} - ${data.details}`;
+          addEvent('auto', `Error: ${errorMsg}`);
+          
+          if (data.fatal) {
+            setErrors(prev => ({ ...prev, auto: errorMsg }));
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                addEvent('auto', 'ABR attempting network error recovery');
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                addEvent('auto', 'ABR attempting media error recovery');
+                hls.recoverMediaError();
+                break;
+              default:
+                addEvent('auto', 'Fatal ABR error - destroying player');
+                hls.destroy();
+                break;
+            }
+          }
+        });
+
+        hls.loadSource(src);
+        hls.attachMedia(video);
+
+        video.addEventListener('canplay', () => {
+          setIsLoading(prev => ({ ...prev, auto: false }));
+          addEvent('auto', 'ABR player ready');
+        });
+        video.addEventListener('playing', () => {
+          updateMetrics('auto', { isPlaying: true });
+          addEvent('auto', 'ABR playback started');
+        });
+        video.addEventListener('pause', () => {
+          updateMetrics('auto', { isPlaying: false });
+          addEvent('auto', 'ABR playback paused');
+        });
+
+        const updateInterval = setInterval(() => {
+          if (video && hls) {
+            updateMetrics('auto', {
+              currentTime: video.currentTime,
+              buffered: getBufferedAmount(video),
+              networkState: video.networkState,
+              readyState: video.readyState
+            });
+          }
+        }, 1000);
+
+        return () => {
+          clearInterval(updateInterval);
+          hls.destroy();
+        };
+      } else {
+        throw new Error('HLS.js is not supported for Auto player');
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setErrors(prev => ({ ...prev, auto: errorMsg }));
+      addEvent('auto', `Auto initialization error: ${errorMsg}`);
+      setIsLoading(prev => ({ ...prev, auto: false }));
+    }
+  }, [src, addEvent, updateMetrics]);
+
   useEffect(() => {
     const cleanupNative = initializeNativePlayer();
     const cleanupHlsjs = initializeHlsjsPlayer();
+    const cleanupAuto = initializeAutoPlayer();
 
     return () => {
       cleanupNative?.then(cleanup => cleanup?.());
       cleanupHlsjs?.then(cleanup => cleanup?.());
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
+      cleanupAuto?.then(cleanup => cleanup?.());
+      if (hlsjsRef.current) {
+        hlsjsRef.current.destroy();
+        hlsjsRef.current = null;
+      }
+      if (autoHlsRef.current) {
+        autoHlsRef.current.destroy();
+        autoHlsRef.current = null;
       }
     };
-  }, [initializeNativePlayer, initializeHlsjsPlayer]);
+  }, [initializeNativePlayer, initializeHlsjsPlayer, initializeAutoPlayer]);
 
   const syncPlayback = (action: 'play' | 'pause' | 'seek', value?: number) => {
     const nativeVideo = nativeVideoRef.current;
     const hlsjsVideo = hlsjsVideoRef.current;
+    const autoVideo = autoVideoRef.current;
 
-    if (!nativeVideo || !hlsjsVideo) return;
+    if (!nativeVideo || !hlsjsVideo || !autoVideo) return;
 
     switch (action) {
       case 'play':
         nativeVideo.play();
         hlsjsVideo.play();
+        autoVideo.play();
         addEvent('native', 'Sync play triggered');
         addEvent('hlsjs', 'Sync play triggered');
+        addEvent('auto', 'Sync play triggered');
         break;
       case 'pause':
         nativeVideo.pause();
         hlsjsVideo.pause();
+        autoVideo.pause();
         addEvent('native', 'Sync pause triggered');
         addEvent('hlsjs', 'Sync pause triggered');
+        addEvent('auto', 'Sync pause triggered');
         break;
       case 'seek':
         if (value !== undefined) {
           nativeVideo.currentTime = value;
           hlsjsVideo.currentTime = value;
+          autoVideo.currentTime = value;
           addEvent('native', `Sync seek to ${value}s`);
           addEvent('hlsjs', `Sync seek to ${value}s`);
+          addEvent('auto', `Sync seek to ${value}s`);
         }
         break;
     }
   };
 
-  const getPlayerStatus = (player: 'native' | 'hlsjs') => {
+  const getPlayerStatus = (player: 'native' | 'hlsjs' | 'auto') => {
     const metric = metrics[`${player}Player`];
     const loading = isLoading[player];
     const error = errors[player];
@@ -352,7 +498,7 @@ export default function ComparisonPlayer({
   return (
     <div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-gray-900">🔄 Safari vs HLS.js Comparison</h2>
+        <h2 className="text-xl font-bold text-gray-900">🔄 Triple HLS Comparison</h2>
         <div className="text-sm text-gray-600">{title}</div>
       </div>
 
@@ -377,16 +523,16 @@ export default function ComparisonPlayer({
           ⏮️ Sync Reset
         </button>
         <div className="ml-auto text-xs text-gray-600">
-          Use sync controls to compare playback behavior
+          Compare Native HLS, HLS.js Standard, and HLS.js ABR
         </div>
       </div>
 
       {/* Video Players */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         {/* Native Player */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-gray-800">Safari Native</h3>
+            <h3 className="text-lg font-semibold text-gray-800">1. Native HLS</h3>
             <div className={`w-3 h-3 rounded-full ${getPlayerStatus('native').color}`} 
                  title={getPlayerStatus('native').status}></div>
           </div>
@@ -418,7 +564,7 @@ export default function ComparisonPlayer({
               muted
             />
             
-            {/* Native Player Info */}
+            {/* Player Info */}
             <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
               <div>Type: {metrics.nativePlayer.playerType}</div>
               <div>Time: {metrics.nativePlayer.currentTime.toFixed(1)}s</div>
@@ -431,7 +577,7 @@ export default function ComparisonPlayer({
         {/* HLS.js Player */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-gray-800">HLS.js</h3>
+            <h3 className="text-lg font-semibold text-gray-800">2. HLS.js Standard</h3>
             <div className={`w-3 h-3 rounded-full ${getPlayerStatus('hlsjs').color}`}
                  title={getPlayerStatus('hlsjs').status}></div>
           </div>
@@ -463,22 +609,73 @@ export default function ComparisonPlayer({
               muted
             />
             
-            {/* HLS.js Player Info */}
+            {/* Player Info */}
             <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
               <div>Type: {metrics.hlsjsPlayer.playerType}</div>
               <div>Time: {metrics.hlsjsPlayer.currentTime.toFixed(1)}s</div>
               <div>Buffer: {metrics.hlsjsPlayer.buffered.toFixed(1)}s</div>
               <div>Quality: {metrics.hlsjsPlayer.quality}</div>
+              {metrics.hlsjsPlayer.bitrate > 0 && (
+                <div>Bitrate: {Math.round(metrics.hlsjsPlayer.bitrate/1000)}kbps</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Auto ABR Player */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-800">3. HLS.js ABR</h3>
+            <div className={`w-3 h-3 rounded-full ${getPlayerStatus('auto').color}`}
+                 title={getPlayerStatus('auto').status}></div>
+          </div>
+          
+          <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+            {isLoading.auto && (
+              <div className="absolute inset-0 bg-black bg-opacity-75 flex items-center justify-center z-10">
+                <div className="text-white text-center">
+                  <div className="animate-spin w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                  <p className="text-sm">Loading ABR...</p>
+                </div>
+              </div>
+            )}
+            
+            {errors.auto && (
+              <div className="absolute inset-0 bg-red-900 bg-opacity-90 flex items-center justify-center z-10">
+                <div className="text-white text-center p-4">
+                  <div className="text-red-400 text-lg mb-2">⚠️</div>
+                  <p className="text-xs">{errors.auto}</p>
+                </div>
+              </div>
+            )}
+            
+            <video
+              ref={autoVideoRef}
+              className="w-full h-full"
+              controls
+              playsInline
+              muted
+            />
+            
+            {/* Player Info */}
+            <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+              <div>Type: {metrics.autoPlayer.playerType}</div>
+              <div>Time: {metrics.autoPlayer.currentTime.toFixed(1)}s</div>
+              <div>Buffer: {metrics.autoPlayer.buffered.toFixed(1)}s</div>
+              <div>Quality: {metrics.autoPlayer.quality}</div>
+              {metrics.autoPlayer.bitrate > 0 && (
+                <div>Bitrate: {Math.round(metrics.autoPlayer.bitrate/1000)}kbps</div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Metrics Comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Event Logs */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Native Events */}
         <div className="space-y-2">
-          <h4 className="font-medium text-gray-800">Safari Native Events</h4>
+          <h4 className="font-medium text-gray-800">Native HLS Events</h4>
           <div className="bg-gray-100 p-3 rounded text-xs font-mono max-h-32 overflow-y-auto">
             {metrics.nativePlayer.events.length > 0 ? (
               metrics.nativePlayer.events.map((event, index) => (
@@ -492,10 +689,24 @@ export default function ComparisonPlayer({
 
         {/* HLS.js Events */}
         <div className="space-y-2">
-          <h4 className="font-medium text-gray-800">HLS.js Events</h4>
+          <h4 className="font-medium text-gray-800">HLS.js Standard Events</h4>
           <div className="bg-gray-100 p-3 rounded text-xs font-mono max-h-32 overflow-y-auto">
             {metrics.hlsjsPlayer.events.length > 0 ? (
               metrics.hlsjsPlayer.events.map((event, index) => (
+                <div key={index} className="mb-1">{event}</div>
+              ))
+            ) : (
+              <div className="text-gray-500">No events yet...</div>
+            )}
+          </div>
+        </div>
+
+        {/* Auto ABR Events */}
+        <div className="space-y-2">
+          <h4 className="font-medium text-gray-800">HLS.js ABR Events</h4>
+          <div className="bg-gray-100 p-3 rounded text-xs font-mono max-h-32 overflow-y-auto">
+            {metrics.autoPlayer.events.length > 0 ? (
+              metrics.autoPlayer.events.map((event, index) => (
                 <div key={index} className="mb-1">{event}</div>
               ))
             ) : (
@@ -508,22 +719,34 @@ export default function ComparisonPlayer({
       {/* Performance Comparison */}
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <h4 className="font-medium text-blue-800 mb-2">Performance Comparison</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
           <div>
             <span className="font-medium">Load Time:</span>
             <div>Native: {metrics.nativePlayer.loadTime}ms</div>
             <div>HLS.js: {metrics.hlsjsPlayer.loadTime}ms</div>
+            <div>ABR: {metrics.autoPlayer.loadTime}ms</div>
           </div>
           <div>
-            <span className="font-medium">Sync Difference:</span>
-            <div className="text-gray-600">
-              {Math.abs(metrics.nativePlayer.currentTime - metrics.hlsjsPlayer.currentTime).toFixed(2)}s
-            </div>
+            <span className="font-medium">Current Bitrate:</span>
+            <div>Native: N/A</div>
+            <div>HLS.js: {Math.round(metrics.hlsjsPlayer.bitrate/1000)}kbps</div>
+            <div>ABR: {Math.round(metrics.autoPlayer.bitrate/1000)}kbps</div>
           </div>
           <div>
             <span className="font-medium">Buffer Health:</span>
             <div>Native: {metrics.nativePlayer.buffered.toFixed(1)}s</div>
             <div>HLS.js: {metrics.hlsjsPlayer.buffered.toFixed(1)}s</div>
+            <div>ABR: {metrics.autoPlayer.buffered.toFixed(1)}s</div>
+          </div>
+          <div>
+            <span className="font-medium">Sync Status:</span>
+            <div className="text-gray-600">
+              Max Diff: {Math.max(
+                Math.abs(metrics.nativePlayer.currentTime - metrics.hlsjsPlayer.currentTime),
+                Math.abs(metrics.hlsjsPlayer.currentTime - metrics.autoPlayer.currentTime),
+                Math.abs(metrics.nativePlayer.currentTime - metrics.autoPlayer.currentTime)
+              ).toFixed(2)}s
+            </div>
           </div>
         </div>
       </div>

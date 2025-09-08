@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HLS Safari Compatibility Test",
-  description: "专业的HLS.js在Safari浏览器下的兼容性测试工具，支持多种视频流格式和设备环境测试",
-  keywords: "HLS, Safari, 兼容性测试, 视频流, HLS.js, 移动端播放",
+  title: "HLS Native vs HLS.js Comparison Tool",
+  description: "专业的原生HLS与HLS.js并排对比测试工具，支持实时性能分析和兼容性验证",
+  keywords: "HLS, Native HLS, HLS.js, 对比测试, 视频流, 兼容性分析, 性能对比",
   manifest: "/manifest.json",
 };
 
