@@ -84,7 +84,7 @@ export default function DeviceInfo() {
       const mseSupported = 'MediaSource' in window;
       
       // Connection info
-      const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+      const connection = (navigator as Navigator & { connection?: { effectiveType?: string; type?: string }; mozConnection?: { effectiveType?: string; type?: string }; webkitConnection?: { effectiveType?: string; type?: string } }).connection || (navigator as Navigator & { mozConnection?: { effectiveType?: string; type?: string } }).mozConnection || (navigator as Navigator & { webkitConnection?: { effectiveType?: string; type?: string } }).webkitConnection;
       const connectionType = connection ? connection.effectiveType || connection.type || 'Unknown' : 'Unknown';
       
       // Screen info

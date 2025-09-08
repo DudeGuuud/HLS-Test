@@ -17,9 +17,9 @@ export default function Home() {
     setPlayerErrors([]);
   }, []);
 
-  const handlePlayerError = useCallback((error: any) => {
+  const handlePlayerError = useCallback((error: Error | string | { message?: string; details?: string }) => {
     const errorMessage = typeof error === 'string' ? error : 
-      error?.message || error?.details || 'Unknown player error';
+      ('message' in error ? error.message : undefined) || ('details' in error ? error.details : undefined) || 'Unknown player error';
     setPlayerErrors(prev => [...prev.slice(0, 4), errorMessage]);
   }, []);
 

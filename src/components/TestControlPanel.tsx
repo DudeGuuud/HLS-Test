@@ -30,7 +30,7 @@ export default function TestControlPanel({ currentStream, onTestResult }: TestCo
     const savedResults = localStorage.getItem('hls-test-results');
     if (savedResults) {
       try {
-        const parsed = JSON.parse(savedResults).map((result: any) => ({
+        const parsed = JSON.parse(savedResults).map((result: TestResult & { timestamp: string }) => ({
           ...result,
           timestamp: new Date(result.timestamp)
         }));

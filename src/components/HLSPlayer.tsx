@@ -7,7 +7,7 @@ interface HLSPlayerProps {
   src: string;
   title: string;
   className?: string;
-  onError?: (error: any) => void;
+  onError?: (error: Error | { type?: string; message?: string; details?: string }) => void;
   onLoadStart?: () => void;
   onLoadComplete?: () => void;
 }
@@ -26,7 +26,7 @@ export default function HLSPlayer({
   const [error, setError] = useState<string | null>(null);
   const [playerInfo, setPlayerInfo] = useState<{
     currentLevel: number;
-    levels: any[];
+    levels: Array<{ height?: number; width?: number; bitrate?: number; name?: string }>;
     isSupported: boolean;
     isSafari: boolean;
     version: string;
@@ -80,7 +80,7 @@ export default function HLSPlayer({
         hlsRef.current = hls;
 
         // Event listeners
-        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+        hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
           console.log('Manifest parsed, levels:', data.levels);
           setPlayerInfo({
             currentLevel: hls.currentLevel,
@@ -92,12 +92,12 @@ export default function HLSPlayer({
           onLoadComplete?.();
         });
 
-        hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
           console.log('Level switched to:', data.level);
           setPlayerInfo(prev => prev ? { ...prev, currentLevel: data.level } : null);
         });
 
-        hls.on(Hls.Events.ERROR, (event, data) => {
+        hls.on(Hls.Events.ERROR, (_, data) => {
           console.error('HLS Error:', data);
           if (data.fatal) {
             setError(`HLS Error: ${data.type} - ${data.details}`);
@@ -125,7 +125,7 @@ export default function HLSPlayer({
     } catch (err) {
       console.error('Player initialization error:', err);
       setError('Failed to initialize player');
-      onError?.(err);
+      onError?.(err instanceof Error ? err : { message: 'Failed to initialize player' });
     } finally {
       setIsLoading(false);
     }
