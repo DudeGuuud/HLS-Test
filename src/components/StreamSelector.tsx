@@ -87,9 +87,22 @@ export default function StreamSelector({ onStreamSelect, selectedStream }: Strea
         <h2 className="text-xl font-bold text-gray-900">🎥 Test Stream Selector</h2>
         <button
           onClick={() => setShowCustomInput(!showCustomInput)}
-          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+          className="group relative px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-medium text-sm rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 ease-in-out"
         >
-          {showCustomInput ? '✕ Cancel' : '➕ Custom URL'}
+          <span className="flex items-center gap-2">
+            {showCustomInput ? (
+              <>
+                <span className="text-red-200">✕</span>
+                Cancel
+              </>
+            ) : (
+              <>
+                <span className="text-yellow-200 group-hover:animate-pulse">🎯</span>
+                Custom URL
+              </>
+            )}
+          </span>
+          <div className="absolute inset-0 rounded-lg bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-200"></div>
         </button>
       </div>
 

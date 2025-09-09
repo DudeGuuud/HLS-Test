@@ -4,10 +4,10 @@ import { useState, useCallback } from 'react';
 import TripleComparisonPlayer from '@/components/TripleComparisonPlayer';
 import DeviceInfo from '@/components/DeviceInfo';
 import StreamSelector from '@/components/StreamSelector';
-import { type StreamConfig } from '@/data/test-streams';
+import { type StreamConfig, TEST_STREAMS } from '@/data/test-streams';
 
 export default function Home() {
-  const [selectedStream, setSelectedStream] = useState<StreamConfig | null>(null);
+  const [selectedStream, setSelectedStream] = useState<StreamConfig | null>(TEST_STREAMS[0]);
   const [tripleMetrics, setTripleMetrics] = useState<{
     nativePlayer: { playerType: string; loadTime: number; currentTime: number; buffered: number; isPlaying: boolean; bitrate: number };
     hlsjsPlayer: { playerType: string; loadTime: number; currentTime: number; buffered: number; isPlaying: boolean; bitrate: number };

@@ -100,18 +100,19 @@ export default function TripleComparisonPlayer({
   }, []);
 
   const updateMetrics = useCallback((player: 'native' | 'hlsjs' | 'auto', updates: Partial<PlayerMetrics>) => {
-    setMetrics(prev => {
-      const newMetrics = {
-        ...prev,
-        [`${player}Player`]: {
-          ...prev[`${player}Player`],
-          ...updates
-        }
-      };
-      onMetricsUpdate?.(newMetrics);
-      return newMetrics;
-    });
-  }, [onMetricsUpdate]);
+    setMetrics(prev => ({
+      ...prev,
+      [`${player}Player`]: {
+        ...prev[`${player}Player`],
+        ...updates
+      }
+    }));
+  }, []);
+
+  // Call onMetricsUpdate when metrics change
+  useEffect(() => {
+    onMetricsUpdate?.(metrics);
+  }, [metrics, onMetricsUpdate]);
 
   const getBufferedAmount = (video: HTMLVideoElement) => {
     if (video.buffered.length > 0) {
